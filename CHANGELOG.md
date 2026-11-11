@@ -13,12 +13,18 @@ Updates should follow the [Keep a CHANGELOG](https://keepachangelog.com/) princi
   IP address — dotted, a single number such as `2130706433`, IPv6 — or a single name such as `metadata`, or with
   port 0, is refused before any request, whatever the configuration, as a `DeliveryFailed` that is not retryable.
 
+### Added
+
+- The option `allow_localhost`, `false` by default, and `WebhookSender`'s `$allowLocalhost`: `true`, in development
+  and tests, lets a receiver be on `localhost` or under `.localhost`; it also needs `allow_private_networks`, since
+  those names resolve to the loopback address. An IP address stays refused.
+
 ### Changed
 
 - `allow_private_networks: true` lets the sender reach a host name that resolves to a private address; an IP address
   written in the URL is refused all the same. The refusal reads `the receiver's URL is not an https URL to a host
   name`, or `… an http or https URL to a host name` with `allow_plain_http`.
-- The package requires `phil/url` 0.1.2.
+- The package requires `phil/url` 0.1.3.
 
 ## 0.1.0-alpha - 2026-11-11
 

@@ -117,9 +117,10 @@ final class TestKernel extends Kernel
             'signing_keys' => [self::senderKey()->toString()],
             'tolerance' => self::TOLERANCE,
             'audience' => self::AUDIENCE,
-            // The sender posts to this kernel, at http://app.localhost.
+            // The sender posts to this kernel, at http://localhost.
             'allow_private_networks' => true,
             'allow_plain_http' => true,
+            'allow_localhost' => true,
             ...$this->configuration,
         ]);
     }

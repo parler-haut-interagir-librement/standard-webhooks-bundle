@@ -19,6 +19,8 @@ phil_standard_webhooks:
     allow_private_networks: false
     # Whether deliveries may go to an http URL rather than https only. false when left out.
     allow_plain_http: false
+    # Whether deliveries may go to localhost or under .localhost, with allow_private_networks. false when left out.
+    allow_localhost: false
 ```
 
 Every key is optional: an application that only receives configures no signing key, one that only sends no
@@ -29,7 +31,7 @@ answers that webhook endpoint with a server error, never another page of the app
 
 `allow_private_networks` and `allow_plain_http` guard the sender against server-side request forgery
 ([sending.md](sending.md#receiver-urls-given-by-others)). Turn them on only for receivers the application itself
-trusts, such as a test kernel at `http://app.localhost`.
+trusts, such as a test kernel at `http://localhost` with `allow_localhost`.
 
 | Refused at build time | Message |
 |---|---|

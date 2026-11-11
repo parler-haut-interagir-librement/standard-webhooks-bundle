@@ -75,6 +75,10 @@ final class PhilStandardWebhooksBundle extends AbstractBundle
                     ->info('Whether deliveries may go to an http URL; false sends to https only.')
                     ->defaultFalse()
                 ->end()
+                ->booleanNode('allow_localhost')
+                    ->info('Whether deliveries may go to localhost or under .localhost, with allow_private_networks: true in development and tests only.')
+                    ->defaultFalse()
+                ->end()
             ->end();
     }
 
@@ -122,6 +126,7 @@ final class PhilStandardWebhooksBundle extends AbstractBundle
             ->args([new Reference('http_client', ContainerInterface::NULL_ON_INVALID_REFERENCE), new Reference(Library::SIGNER), new Reference(SigningKeys::class), $clock])
             ->arg('$allowPrivateNetworks', $config['allow_private_networks'])
             ->arg('$allowPlainHttp', $config['allow_plain_http'])
+            ->arg('$allowLocalhost', $config['allow_localhost'])
             ->public();
 
         if (class_exists(Command::class)) {

@@ -1,4 +1,4 @@
-<!-- phil-dev source-sha256=2159ab5587445f1e0aabf4ffef930defeb87ebf5226ef0a7f292c1ac94a0c00f -->
+<!-- phil-dev source-sha256=8802277bff73ebed282202c5fbeff18167a1a6054b9f7692ab37187c89e6a71e -->
 # Envoi
 
 `WebhookSender::send()` fait une tentative d'une livraison : le corps, signé avec les clés de signature configurées à
@@ -41,8 +41,9 @@ code d'état ou l'erreur de transport revenant comme réponse. L'expéditeur, pa
 - lit l'URL avec phil/url, comme un navigateur la lit, et l'envoie sous sa forme canonique : une URL avec un nom
   d'utilisateur ou un mot de passe, ou dont l'hôte est une adresse IP (avec des points, en un seul nombre comme
   `2130706433`, en IPv6) ou un seul nom comme `metadata`, est refusée de la même façon, avant toute requête, quelle
-  que soit la configuration. Nommez un récepteur du réseau interne par un nom d'hôte, `hooks.internal.example`, ou
-  sous `.localhost` ;
+  que soit la configuration. Nommez un récepteur du réseau interne par un nom d'hôte, `hooks.internal.example`.
+  `localhost` et les noms sous `.localhost` sont aussi refusés à moins de `allow_localhost: true`, pour un récepteur
+  du poste de développement, qui a alors aussi besoin de `allow_private_networks: true` ;
 - enveloppe le client HTTP dans le `NoPrivateNetworkHttpClient` de Symfony, qui refuse un hôte qui se résout en une
   adresse de bouclage, privée, de lien local ou réservée, avant que rien ne soit envoyé : un `DeliveryFailed` sans
   état, dont le message dit que l'hôte `is blocked`. `allow_private_networks: true` retire la protection ; il a

@@ -25,7 +25,8 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * only an `https` URL is sent to, unless `$allowPlainHttp`; the URL is read by phil/url, as a browser reads it, and
  * sent in its canonical form, so that one with a user name or a password, or whose host is an IP address — written
  * dotted, as a single number, or in IPv6 — or a single name, `https://metadata/`, is refused before any request,
- * whatever the configuration; and, unless `$allowPrivateNetworks`, the client is wrapped in
+ * whatever the configuration — `localhost` and the names under `.localhost` too, unless `$allowLocalhost`, for a
+ * receiver of the development machine, which then also needs `$allowPrivateNetworks`; and, unless `$allowPrivateNetworks`, the client is wrapped in
  * `NoPrivateNetworkHttpClient`, which refuses a host that resolves to a loopback, private, link-local or reserved
  * address — a cloud metadata endpoint, a service of the internal network.
  */
@@ -41,6 +42,7 @@ final readonly class WebhookSender
         private float $timeout = 10.0,
         bool $allowPrivateNetworks = false,
         private bool $allowPlainHttp = false,
+        private bool $allowLocalhost = false,
     ) {
         $this->client = !$client instanceof HttpClientInterface || $allowPrivateNetworks ? $client : $this->guarded($client);
     }
@@ -93,7 +95,7 @@ final readonly class WebhookSender
     private function address(string $url): ?Url
     {
         try {
-            return Url::fromString($url);
+            return Url::fromString($url, allowLocalhost: $this->allowLocalhost);
         } catch (InvalidUrl) {
             return null;
         }

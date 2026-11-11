@@ -39,7 +39,9 @@ The sender therefore:
 - reads the URL with phil/url, as a browser reads it, and sends it in its canonical form: a URL with a user name or a
   password, or whose host is an IP address — dotted, a single number such as `2130706433`, IPv6 — or a single name
   such as `metadata`, is refused the same way, before any request, whatever the configuration. Name a receiver of
-  the internal network by a host name, `hooks.internal.example`, or under `.localhost`;
+  the internal network by a host name, `hooks.internal.example`. `localhost` and the names under `.localhost` are
+  refused too unless `allow_localhost: true`, for a receiver of the development machine, which then also needs
+  `allow_private_networks: true`;
 - wraps the HTTP client in Symfony's `NoPrivateNetworkHttpClient`, which refuses a host that resolves to a loopback,
   private, link-local or reserved address, before anything is sent: a `DeliveryFailed` without a status, whose
   message says the host `is blocked`. `allow_private_networks: true` removes the guard; it needs

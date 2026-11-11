@@ -34,7 +34,7 @@ final class PhilStandardWebhooksBundleTest extends TestCase
 {
     public function testTheServicesFollowTheConfiguration(): void
     {
-        $container = $this->load([['signing_keys' => ['whsk_a', 'whsec_b'], 'verification_keys' => ['whpk_c'], 'tolerance' => 120, 'audience' => 'receiver-1', 'connection' => 'webhooks', 'allow_private_networks' => true, 'allow_plain_http' => true]]);
+        $container = $this->load([['signing_keys' => ['whsk_a', 'whsec_b'], 'verification_keys' => ['whpk_c'], 'tolerance' => 120, 'audience' => 'receiver-1', 'connection' => 'webhooks', 'allow_private_networks' => true, 'allow_plain_http' => true, 'allow_localhost' => true]]);
 
         self::assertSame('phil_standard_webhooks', $this->extension()->getAlias());
         self::assertSame(['service_container', Signer::class, Verifier::class, 'phil_standard_webhooks.tolerance', SigningKeys::class, FixedKeys::class, WebhookReceiver::class, VerifiedWebhookResolver::class, WebhookSender::class, GenerateKeyCommand::class, DbalProcessedWebhooks::class, ProcessedWebhookSchemaListener::class], array_keys($container->getDefinitions()));
@@ -48,7 +48,7 @@ final class PhilStandardWebhooksBundleTest extends TestCase
         $clock = new Reference('clock');
         self::assertEquals([new ServiceClosureArgument(new Reference(WebhookReceiver::class)), $clock], $container->getDefinition(VerifiedWebhookResolver::class)->getArguments());
         self::assertSame([['name' => 'phil_standard_webhooks', 'before' => ['argument_resolver.request_attribute', 'doctrine.orm.entity_value_resolver']]], $container->getDefinition(VerifiedWebhookResolver::class)->getTag('controller.argument_value_resolver'));
-        self::assertEquals([new Reference('http_client', ContainerInterface::NULL_ON_INVALID_REFERENCE), new Reference(Signer::class), new Reference(SigningKeys::class), $clock, '$allowPrivateNetworks' => true, '$allowPlainHttp' => true], $container->getDefinition(WebhookSender::class)->getArguments());
+        self::assertEquals([new Reference('http_client', ContainerInterface::NULL_ON_INVALID_REFERENCE), new Reference(Signer::class), new Reference(SigningKeys::class), $clock, '$allowPrivateNetworks' => true, '$allowPlainHttp' => true, '$allowLocalhost' => true], $container->getDefinition(WebhookSender::class)->getArguments());
         self::assertTrue($container->getDefinition(WebhookSender::class)->isPublic());
         self::assertTrue($container->getDefinition(GenerateKeyCommand::class)->hasTag('console.command'));
 
@@ -68,7 +68,7 @@ final class PhilStandardWebhooksBundleTest extends TestCase
         self::assertSame([[]], $container->getDefinition(SigningKeys::class)->getArguments());
         self::assertSame([[]], $container->getDefinition(FixedKeys::class)->getArguments());
         self::assertNull($container->getDefinition(WebhookReceiver::class)->getArgument(2));
-        self::assertSame([false, false], [$container->getDefinition(WebhookSender::class)->getArgument('$allowPrivateNetworks'), $container->getDefinition(WebhookSender::class)->getArgument('$allowPlainHttp')], 'Deliveries go to https URLs outside private networks by default.');
+        self::assertSame([false, false, false], [$container->getDefinition(WebhookSender::class)->getArgument('$allowPrivateNetworks'), $container->getDefinition(WebhookSender::class)->getArgument('$allowPlainHttp'), $container->getDefinition(WebhookSender::class)->getArgument('$allowLocalhost')], 'Deliveries go to https URLs outside private networks and localhost by default.');
         self::assertEquals([new Reference('doctrine.dbal.default_connection')], $container->getDefinition(DbalProcessedWebhooks::class)->getArguments());
         self::assertFalse($this->load([['connection' => null]])->hasDefinition(DbalProcessedWebhooks::class));
         self::assertFalse($this->load([['connection' => null]])->hasAlias(ProcessedWebhookRepository::class));

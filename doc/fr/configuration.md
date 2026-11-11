@@ -1,4 +1,4 @@
-<!-- phil-dev source-sha256=32b0192e12b67ed676986a00fe7638b678dccb8d496ad64068b4e4efa7ec9691 -->
+<!-- phil-dev source-sha256=6a6d6b81f478c200561f6b17662f16fd996c122e9573a2e9b9532b975f245895 -->
 # Configuration
 
 ```yaml
@@ -20,6 +20,8 @@ phil_standard_webhooks:
     allow_private_networks: false
     # Whether deliveries may go to an http URL rather than https only. false when left out.
     allow_plain_http: false
+    # Whether deliveries may go to localhost or under .localhost, with allow_private_networks. false when left out.
+    allow_localhost: false
 ```
 
 Chaque clé est facultative : une application qui ne fait que recevoir ne configure aucune clé de signature, une
@@ -31,7 +33,7 @@ terminaison de webhooks par une erreur serveur, jamais une autre page de l'appli
 
 `allow_private_networks` et `allow_plain_http` protègent l'expéditeur contre la falsification de requête côté serveur
 ([sending.md](sending.md#des-url-de-récepteurs-données-par-dautres)). Ne les activez que pour des récepteurs auxquels
-l'application elle-même fait confiance, comme un noyau de test à `http://app.localhost`.
+l'application elle-même fait confiance, comme un noyau de test à `http://localhost` avec `allow_localhost`.
 
 | Refusé à la construction | Message |
 |---|---|

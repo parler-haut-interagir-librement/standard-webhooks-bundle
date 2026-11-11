@@ -223,6 +223,56 @@ final class WebhookSenderTest extends TestCase
         self::assertCount(0, $sent);
     }
 
+    public function testAReceiverOnLocalhostIsSentToOnlyWhenAllowed(): void
+    {
+        $sent = new ArrayObject();
+        $client = new MockHttpClient(static function (string $method, string $url) use ($sent): MockResponse {
+            $sent->append($url);
+
+            return new MockResponse('', ['http_code' => 204]);
+        });
+        $sender = static fn (bool $allowLocalhost, bool $allowPrivateNetworks = true): WebhookSender => new WebhookSender($client, new Signer(), new SigningKeys(HmacSecret::generate()), new NativeClock(), allowPrivateNetworks: $allowPrivateNetworks, allowPlainHttp: true, allowLocalhost: $allowLocalhost);
+
+        foreach (['http://localhost:8000/hook', 'http://app.localhost/hook'] as $url) {
+            try {
+                $sender(false)->send($url, self::BODY, WebhookId::fromString('msg_1'));
+                self::fail($url.' was sent to.');
+            } catch (DeliveryFailed $deliveryFailed) {
+                self::assertStringContainsString('to a host name', $deliveryFailed->getMessage());
+            }
+
+            $sender(true)->send($url, self::BODY, WebhookId::fromString('msg_1'));
+        }
+
+        foreach (['http://127.0.0.1/hook', 'http://localhostx/hook', 'http://intranet/hook'] as $url) {
+            try {
+                $sender(true)->send($url, self::BODY, WebhookId::fromString('msg_1'));
+                self::fail($url.' was sent to.');
+            } catch (DeliveryFailed $deliveryFailed) {
+                self::assertStringContainsString('to a host name', $deliveryFailed->getMessage());
+            }
+        }
+
+        self::assertSame(['http://localhost:8000/hook', 'http://app.localhost/hook'], $sent->getArrayCopy());
+
+        try {
+            new WebhookSender($client, new Signer(), new SigningKeys(HmacSecret::generate()), new NativeClock(), allowPrivateNetworks: true, allowPlainHttp: true)->send('http://localhost:8000/hook', self::BODY, WebhookId::fromString('msg_1'));
+            self::fail('localhost was sent to by default.');
+        } catch (DeliveryFailed $deliveryFailed) {
+            self::assertStringContainsString('to a host name', $deliveryFailed->getMessage());
+        }
+
+        // localhost resolves to the loopback address: the guard still stops it unless private networks are allowed.
+        try {
+            $sender(true, false)->send('http://localhost:8000/hook', self::BODY, WebhookId::fromString('msg_1'));
+            self::fail('localhost was sent to past the guard.');
+        } catch (DeliveryFailed $deliveryFailed) {
+            self::assertStringContainsString('is blocked for', $deliveryFailed->getMessage());
+        }
+
+        self::assertCount(2, $sent);
+    }
+
     public function testTheAddressIsSentInItsCanonicalForm(): void
     {
         $sent = new ArrayObject();
