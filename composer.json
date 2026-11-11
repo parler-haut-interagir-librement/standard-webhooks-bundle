@@ -22,7 +22,7 @@
     "require": {
         "php": ">=8.5",
         "phil/standard-webhooks": "^0.1@dev",
-        "phil/url": "^0.1.3@alpha",
+        "phil/url": "^0.1.3@dev",
         "psr/clock": "^1.0",
         "symfony/config": "^8.2",
         "symfony/dependency-injection": "^8.2",
