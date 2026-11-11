@@ -63,9 +63,9 @@ $id = $sender->send('https://partner.example/webhooks', $body);   // a WebhookSe
 
 ## Requirements
 
-PHP 8.5 or later; `phil/standard-webhooks` 0.1, which requires `ext-sodium`; `psr/clock` 1.0; Symfony 8.2's
-dependency injection, config, HTTP foundation and HTTP kernel. Symfony's HTTP client, Doctrine DBAL and ORM with
-DoctrineBundle, and Symfony Console are optional.
+PHP 8.5 or later; `phil/standard-webhooks` 0.1, which requires `ext-sodium`; `phil/url` 0.1.2, which requires the intl,
+mbstring and URI extensions; `psr/clock` 1.0; Symfony 8.2's dependency injection, config, HTTP foundation and HTTP
+kernel. Symfony's HTTP client, Doctrine DBAL and ORM with DoctrineBundle, and Symfony Console are optional.
 
 ## Contributing
 

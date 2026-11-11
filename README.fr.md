@@ -1,4 +1,4 @@
-<!-- phil-dev source-sha256=b58ef9fac2619efa267dd3311877bca4b78b0c444aad9bc6fd60de5c3aa4ac2e -->
+<!-- phil-dev source-sha256=e349a50a6632afc276d5960dc03938b9c85a3e261278d3c3fcdf901320ea0a9d -->
 # phil/standard-webhooks-bundle
 
 **Des livraisons de webhooks vérifiées en arguments de contrôleur, et des webhooks signés envoyés depuis Symfony.**
@@ -66,9 +66,10 @@ $id = $sender->send('https://partner.example/webhooks', $body);   // a WebhookSe
 
 ## Prérequis
 
-PHP 8.5 ou plus récent ; `phil/standard-webhooks` 0.1, qui requiert `ext-sodium` ; `psr/clock` 1.0 ; les composants
-dependency injection, config, HTTP foundation et HTTP kernel de Symfony 8.2. Le client HTTP de Symfony, Doctrine DBAL
-et ORM avec DoctrineBundle, et Symfony Console sont facultatifs.
+PHP 8.5 ou plus récent ; `phil/standard-webhooks` 0.1, qui requiert `ext-sodium` ; `phil/url` 0.1.2, qui requiert les
+extensions intl, mbstring et URI ; `psr/clock` 1.0 ; les composants dependency injection, config, HTTP foundation et
+HTTP kernel de Symfony 8.2. Le client HTTP de Symfony, Doctrine DBAL et ORM avec DoctrineBundle, et Symfony Console sont
+facultatifs.
 
 ## Contribuer
 

@@ -1,4 +1,4 @@
-<!-- phil-dev source-sha256=28044b11558101ff6edf3343af29c40500ef992f47db50dc7b521e0f53ee839f -->
+<!-- phil-dev source-sha256=32b0192e12b67ed676986a00fe7638b678dccb8d496ad64068b4e4efa7ec9691 -->
 # Configuration
 
 ```yaml
@@ -31,7 +31,7 @@ terminaison de webhooks par une erreur serveur, jamais une autre page de l'appli
 
 `allow_private_networks` et `allow_plain_http` protègent l'expéditeur contre la falsification de requête côté serveur
 ([sending.md](sending.md#des-url-de-récepteurs-données-par-dautres)). Ne les activez que pour des récepteurs auxquels
-l'application elle-même fait confiance, comme un noyau de test à `http://localhost`.
+l'application elle-même fait confiance, comme un noyau de test à `http://app.localhost`.
 
 | Refusé à la construction | Message |
 |---|---|

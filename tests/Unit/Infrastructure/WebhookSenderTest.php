@@ -33,6 +33,9 @@ final class WebhookSenderTest extends TestCase
 {
     private const string BODY = '{"type":"invoice.paid","timestamp":"2026-10-31T12:00:00Z","data":{}}';
 
+    // The tests send to hooks.example, which resolves to nothing: those not about the private-network guard allow
+    // private networks, so that no lookup decides them.
+
     public function testADeliveryIsSignedAndPosted(): void
     {
         $current = HmacSecret::generate();
@@ -44,12 +47,12 @@ final class WebhookSenderTest extends TestCase
             return new MockResponse('', ['http_code' => 204]);
         });
         $now = new DateTimeImmutable('2026-11-03 12:00');
-        $id = new WebhookSender($client, new Signer(), new SigningKeys($current, $old), $this->clock($now), 2.5)->send('https://93.184.215.14/hook', self::BODY, headers: ['X-Tenant' => 'a']);
+        $id = new WebhookSender($client, new Signer(), new SigningKeys($current, $old), $this->clock($now), 2.5, allowPrivateNetworks: true)->send('https://hooks.example/hook', self::BODY, headers: ['X-Tenant' => 'a']);
 
         self::assertMatchesRegularExpression('/^msg_/', $id->value);
         self::assertCount(1, $sent);
         [$method, $url, $options] = $sent[0];
-        self::assertSame(['POST', 'https://93.184.215.14/hook', self::BODY, 0, 2.5], [$method, $url, $options['body'], $options['max_redirects'], $options['timeout']]);
+        self::assertSame(['POST', 'https://hooks.example/hook', self::BODY, 0, 2.5], [$method, $url, $options['body'], $options['max_redirects'], $options['timeout']]);
         $headers = $this->headers($options['headers']);
         self::assertSame(['application/json', 'a', $id->value, (string) $now->getTimestamp()], [$headers['content-type'], $headers['x-tenant'], $headers['webhook-id'], $headers['webhook-timestamp']]);
         self::assertSame(2, substr_count($headers['webhook-signature'], 'v1,'));
@@ -68,7 +71,7 @@ final class WebhookSenderTest extends TestCase
         });
         $id = WebhookId::fromString('msg_1');
 
-        self::assertSame($id, new WebhookSender($client, new Signer(), new SigningKeys(HmacSecret::generate()), new NativeClock())->send('https://93.184.215.14/hook', self::BODY, $id, ['webhook-id' => 'msg_forged', 'Content-Type' => 'text/plain']));
+        self::assertSame($id, new WebhookSender($client, new Signer(), new SigningKeys(HmacSecret::generate()), new NativeClock(), allowPrivateNetworks: true)->send('https://hooks.example/hook', self::BODY, $id, ['webhook-id' => 'msg_forged', 'Content-Type' => 'text/plain']));
         $headers = $this->headers($sent[0]['headers']);
         self::assertSame(['msg_1', 'text/plain', 10.0], [$headers['webhook-id'], $headers['content-type'], $sent[0]['timeout']]);
         self::assertEqualsWithDelta(time(), (int) $headers['webhook-timestamp'], 5);
@@ -77,10 +80,10 @@ final class WebhookSenderTest extends TestCase
     public function testAnAnswerOutsideTwoHundredsIsAFailure(): void
     {
         foreach ([199 => false, 200 => true, 299 => true, 300 => false, 500 => false] as $status => $acknowledged) {
-            $sender = new WebhookSender(new MockHttpClient(new MockResponse('', ['http_code' => $status])), new Signer(), new SigningKeys(HmacSecret::generate()), new NativeClock());
+            $sender = new WebhookSender(new MockHttpClient(new MockResponse('', ['http_code' => $status])), new Signer(), new SigningKeys(HmacSecret::generate()), new NativeClock(), allowPrivateNetworks: true);
 
             try {
-                $sender->send('https://93.184.215.14/hook', self::BODY, WebhookId::fromString('msg_1'));
+                $sender->send('https://hooks.example/hook', self::BODY, WebhookId::fromString('msg_1'));
                 self::assertTrue($acknowledged, (string) $status);
             } catch (DeliveryFailed $deliveryFailed) {
                 self::assertFalse($acknowledged, (string) $status);
@@ -104,13 +107,13 @@ final class WebhookSenderTest extends TestCase
         });
 
         try {
-            new WebhookSender($client, new Signer(), new SigningKeys(HmacSecret::generate()), new NativeClock())->send('https://93.184.215.14/hook', self::BODY, WebhookId::fromString('msg_1'));
+            new WebhookSender($client, new Signer(), new SigningKeys(HmacSecret::generate()), new NativeClock(), allowPrivateNetworks: true)->send('https://hooks.example/hook', self::BODY, WebhookId::fromString('msg_1'));
             self::fail('A redirect was followed.');
         } catch (DeliveryFailed $deliveryFailed) {
             self::assertSame(302, $deliveryFailed->status);
         }
 
-        self::assertSame(['https://93.184.215.14/hook'], $sent->getArrayCopy());
+        self::assertSame(['https://hooks.example/hook'], $sent->getArrayCopy());
     }
 
     public function testNoAnswerIsAFailure(): void
@@ -118,7 +121,7 @@ final class WebhookSenderTest extends TestCase
         $client = new MockHttpClient(static fn (): MockResponse => throw new TransportException('Connection refused'));
 
         try {
-            new WebhookSender($client, new Signer(), new SigningKeys(HmacSecret::generate()), new NativeClock())->send('https://93.184.215.14/hook', self::BODY, WebhookId::fromString('msg_1'));
+            new WebhookSender($client, new Signer(), new SigningKeys(HmacSecret::generate()), new NativeClock(), allowPrivateNetworks: true)->send('https://hooks.example/hook', self::BODY, WebhookId::fromString('msg_1'));
             self::fail('An unanswered delivery succeeded.');
         } catch (DeliveryFailed $deliveryFailed) {
             self::assertSame([null, 'The webhook msg_1 was not answered: Connection refused', 0, true], [$deliveryFailed->status, $deliveryFailed->getMessage(), $deliveryFailed->getCode(), $deliveryFailed->retryable]);
@@ -131,42 +134,43 @@ final class WebhookSenderTest extends TestCase
      */
     public static function privateAddresses(): iterable
     {
-        yield 'cloud metadata' => ['https://169.254.169.254/latest/meta-data/'];
-        yield 'loopback' => ['https://127.0.0.1:8443/admin'];
-        yield 'IPv6 loopback' => ['https://[::1]/admin'];
-        yield 'private network' => ['https://10.0.0.7/internal'];
+        yield 'cloud metadata' => ['169.254.169.254'];
+        yield 'loopback' => ['127.0.0.1'];
+        yield 'IPv6 loopback' => ['::1'];
+        yield 'private network' => ['10.0.0.7'];
     }
 
     #[DataProvider('privateAddresses')]
-    public function testAPrivateAddressIsNotSentTo(string $url): void
+    public function testAHostThatResolvesToAPrivateAddressIsNotSentTo(string $ip): void
     {
+        /** @var ArrayObject<int, string> $sent */
         $sent = new ArrayObject();
-        $client = new MockHttpClient(static function (string $method, string $url) use ($sent): MockResponse {
+        // The guard checks the host before the request — hooks.example resolves to nothing, which it refuses too — and
+        // the address the client connects to, here a private one.
+        $client = new MockHttpClient(static function (string $method, string $url) use ($sent, $ip): MockResponse {
             $sent->append($url);
 
-            return new MockResponse('', ['http_code' => 204]);
+            return new MockResponse('', ['http_code' => 204, 'primary_ip' => $ip]);
         });
 
         try {
-            new WebhookSender($client, new Signer(), new SigningKeys(HmacSecret::generate()), new NativeClock())->send($url, self::BODY, WebhookId::fromString('msg_1'));
-            self::fail($url.' was sent to.');
+            new WebhookSender($client, new Signer(), new SigningKeys(HmacSecret::generate()), new NativeClock())->send('https://hooks.example/hook', self::BODY, WebhookId::fromString('msg_1'));
+            self::fail($ip.' was sent to.');
         } catch (DeliveryFailed $deliveryFailed) {
             self::assertNull($deliveryFailed->status);
             self::assertStringContainsString('is blocked for', $deliveryFailed->getMessage());
         }
 
-        self::assertCount(0, $sent);
-        self::assertSame('msg_1', new WebhookSender($client, new Signer(), new SigningKeys(HmacSecret::generate()), new NativeClock(), allowPrivateNetworks: true)->send($url, self::BODY, WebhookId::fromString('msg_1'))->value, 'Allowed by the configuration, a private address is sent to.');
-        self::assertCount(1, $sent);
+        self::assertSame('msg_1', new WebhookSender($client, new Signer(), new SigningKeys(HmacSecret::generate()), new NativeClock(), allowPrivateNetworks: true)->send('https://hooks.example/hook', self::BODY, WebhookId::fromString('msg_1'))->value, 'Allowed by the configuration, a private address is sent to.');
     }
 
     public function testOnlyAnHttpsUrlIsSentToUnlessPlainHttpIsAllowed(): void
     {
         $client = new MockHttpClient(static fn (): MockResponse => new MockResponse('', ['http_code' => 204]));
-        $strict = new WebhookSender($client, new Signer(), new SigningKeys(HmacSecret::generate()), new NativeClock());
-        $lenient = new WebhookSender($client, new Signer(), new SigningKeys(HmacSecret::generate()), new NativeClock(), allowPlainHttp: true);
+        $strict = new WebhookSender($client, new Signer(), new SigningKeys(HmacSecret::generate()), new NativeClock(), allowPrivateNetworks: true);
+        $lenient = new WebhookSender($client, new Signer(), new SigningKeys(HmacSecret::generate()), new NativeClock(), allowPrivateNetworks: true, allowPlainHttp: true);
 
-        foreach ([[$strict, 'http://93.184.215.14/hook', 'is not an https URL'], [$strict, 'ftp://93.184.215.14/hook', 'is not an https URL'], [$strict, '/hook', 'is not an https URL'], [$lenient, 'gopher://93.184.215.14/hook', 'is not an http or https URL'], [$lenient, 'file:///etc/passwd', 'is not an http or https URL']] as [$sender, $url, $reason]) {
+        foreach ([[$strict, 'http://hooks.example/hook', 'is not an https URL to a host name'], [$strict, 'ftp://hooks.example/hook', 'is not an https URL to a host name'], [$strict, '/hook', 'is not an https URL to a host name'], [$lenient, 'gopher://hooks.example/hook', 'is not an http or https URL to a host name'], [$lenient, 'file:///etc/passwd', 'is not an http or https URL to a host name']] as [$sender, $url, $reason]) {
             try {
                 $sender->send($url, self::BODY, WebhookId::fromString('msg_1'));
                 self::fail($url.' was sent to.');
@@ -175,8 +179,62 @@ final class WebhookSenderTest extends TestCase
             }
         }
 
-        self::assertSame('msg_2', $lenient->send('HTTP://93.184.215.14/hook', self::BODY, WebhookId::fromString('msg_2'))->value);
-        self::assertSame('msg_3', $strict->send('HTTPS://93.184.215.14/hook', self::BODY, WebhookId::fromString('msg_3'))->value);
+        self::assertSame('msg_2', $lenient->send('HTTP://hooks.example/hook', self::BODY, WebhookId::fromString('msg_2'))->value);
+        self::assertSame('msg_3', $strict->send('HTTPS://hooks.example/hook', self::BODY, WebhookId::fromString('msg_3'))->value);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function unreadableAddresses(): iterable
+    {
+        // parse_url() read the scheme only: each of these went on to the HTTP client, and, with private networks
+        // allowed, to its host.
+        yield 'a user and a password' => ['https://user:secret@hooks.example/hook'];
+        yield 'credentials before the host' => ['https://hooks.example@evil.example/hook'];
+        yield 'an IP address' => ['https://127.0.0.1/hook'];
+        yield 'an IP address in decimal' => ['https://2130706433/hook'];
+        yield 'an IPv6 address' => ['https://[::1]/hook'];
+        yield 'a host of one name' => ['https://metadata/computeMetadata/v1/'];
+        yield 'port 0' => ['https://hooks.example:0/hook'];
+        yield 'no host' => ['https:///hook'];
+    }
+
+    #[DataProvider('unreadableAddresses')]
+    public function testAnAddressThatIsNotAHostNameIsNeverSentTo(string $url): void
+    {
+        $sent = new ArrayObject();
+        $client = new MockHttpClient(static function (string $method, string $url) use ($sent): MockResponse {
+            $sent->append($url);
+
+            return new MockResponse('', ['http_code' => 204]);
+        });
+
+        foreach ([false, true] as $plainHttp) {
+            try {
+                new WebhookSender($client, new Signer(), new SigningKeys(HmacSecret::generate()), new NativeClock(), allowPrivateNetworks: true, allowPlainHttp: $plainHttp)->send($url, self::BODY, WebhookId::fromString('msg_1'));
+                self::fail($url.' was sent to.');
+            } catch (DeliveryFailed $deliveryFailed) {
+                self::assertSame([null, false], [$deliveryFailed->status, $deliveryFailed->retryable]);
+                self::assertStringContainsString('to a host name', $deliveryFailed->getMessage());
+            }
+        }
+
+        self::assertCount(0, $sent);
+    }
+
+    public function testTheAddressIsSentInItsCanonicalForm(): void
+    {
+        $sent = new ArrayObject();
+        $client = new MockHttpClient(static function (string $method, string $url) use ($sent): MockResponse {
+            $sent->append($url);
+
+            return new MockResponse('', ['http_code' => 204]);
+        });
+
+        new WebhookSender($client, new Signer(), new SigningKeys(HmacSecret::generate()), new NativeClock(), allowPrivateNetworks: true)->send('HTTPS://Hooks.Bücher.Example.:443/a/%2e%2e/hook', self::BODY);
+
+        self::assertSame(['https://hooks.xn--bcher-kva.example/hook'], $sent->getArrayCopy());
     }
 
     public function testWithoutAClientNothingIsSent(): void
@@ -184,7 +242,7 @@ final class WebhookSenderTest extends TestCase
         $this->expectException(LogicException::class);
         $this->expectExceptionMessageIsOrContains('Sending webhooks needs an HTTP client: enable framework.http_client.');
 
-        new WebhookSender(null, new Signer(), new SigningKeys(HmacSecret::generate()), new NativeClock())->send('https://93.184.215.14/hook', self::BODY);
+        new WebhookSender(null, new Signer(), new SigningKeys(HmacSecret::generate()), new NativeClock())->send('https://hooks.example/hook', self::BODY);
     }
 
     /**

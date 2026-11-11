@@ -4,6 +4,22 @@ All notable changes to `phil/standard-webhooks-bundle` will be documented in thi
 
 Updates should follow the [Keep a CHANGELOG](https://keepachangelog.com/) principles.
 
+## 0.1.1-alpha - 2026-11-11
+
+### Security
+
+- `WebhookSender` reads the receiver's URL by `phil/url`, as a browser reads it, no longer by `parse_url()`, which
+  read its scheme only, and sends it in its canonical form. A URL with a user name or a password, or whose host is an
+  IP address — dotted, a single number such as `2130706433`, IPv6 — or a single name such as `metadata`, or with
+  port 0, is refused before any request, whatever the configuration, as a `DeliveryFailed` that is not retryable.
+
+### Changed
+
+- `allow_private_networks: true` lets the sender reach a host name that resolves to a private address; an IP address
+  written in the URL is refused all the same. The refusal reads `the receiver's URL is not an https URL to a host
+  name`, or `… an http or https URL to a host name` with `allow_plain_http`.
+- The package requires `phil/url` 0.1.2.
+
 ## 0.1.0-alpha - 2026-11-11
 
 ### Added

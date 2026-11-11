@@ -9,6 +9,8 @@ use Phil\StandardWebhooks\Signer;
 use Phil\StandardWebhooks\WebhookId;
 use Phil\StandardWebhooks\WebhookTimestamp;
 use Phil\StandardWebhooksBundle\Application\SigningKeys;
+use Phil\Url\Exception\InvalidUrl;
+use Phil\Url\Url;
 use Psr\Clock\ClockInterface;
 use Symfony\Component\HttpClient\NoPrivateNetworkHttpClient;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
@@ -20,9 +22,12 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * the receiver's deduplication absorbs it. The retry schedule is the application's.
  *
  * A receiver's URL is usually given by a third party, so the sender guards against server-side request forgery:
- * only an `https` URL is sent to, unless `$allowPlainHttp`; and, unless `$allowPrivateNetworks`, the client is
- * wrapped in `NoPrivateNetworkHttpClient`, which refuses a host that is or resolves to a loopback, private,
- * link-local or reserved address — a cloud metadata endpoint, a service of the internal network.
+ * only an `https` URL is sent to, unless `$allowPlainHttp`; the URL is read by phil/url, as a browser reads it, and
+ * sent in its canonical form, so that one with a user name or a password, or whose host is an IP address — written
+ * dotted, as a single number, or in IPv6 — or a single name, `https://metadata/`, is refused before any request,
+ * whatever the configuration; and, unless `$allowPrivateNetworks`, the client is wrapped in
+ * `NoPrivateNetworkHttpClient`, which refuses a host that resolves to a loopback, private, link-local or reserved
+ * address — a cloud metadata endpoint, a service of the internal network.
  */
 final readonly class WebhookSender
 {
@@ -54,18 +59,17 @@ final readonly class WebhookSender
         }
 
         $id ??= WebhookId::generate();
-        $scheme = parse_url($url, \PHP_URL_SCHEME);
-        $scheme = \is_string($scheme) ? strtolower($scheme) : '';
+        $address = $this->address($url);
 
-        if ('https' !== $scheme && ('http' !== $scheme || !$this->allowPlainHttp)) {
-            throw DeliveryFailed::refused($id, $this->allowPlainHttp ? "the receiver's URL is not an http or https URL" : "the receiver's URL is not an https URL");
+        if (!$address instanceof Url || ('https' !== $address->scheme && !$this->allowPlainHttp)) {
+            throw DeliveryFailed::refused($id, $this->allowPlainHttp ? "the receiver's URL is not an http or https URL to a host name" : "the receiver's URL is not an https URL to a host name");
         }
 
         [$key, $others] = $this->keys->split();
         $signed = $this->signer->sign($id, WebhookTimestamp::fromDateTime($this->clock->now()), $body, $key, ...$others);
 
         try {
-            $status = $this->client->request('POST', $url, [
+            $status = $this->client->request('POST', $address->toString(), [
                 'headers' => ['Content-Type' => 'application/json', ...$headers, ...$signed->toArray()],
                 'body' => $body,
                 'max_redirects' => 0,
@@ -80,6 +84,19 @@ final readonly class WebhookSender
         }
 
         return $id;
+    }
+
+    /**
+     * The receiver's address, read by phil/url as a browser reads it; none when it is no http or https address to a
+     * host name.
+     */
+    private function address(string $url): ?Url
+    {
+        try {
+            return Url::fromString($url);
+        } catch (InvalidUrl) {
+            return null;
+        }
     }
 
     private function guarded(HttpClientInterface $client): HttpClientInterface

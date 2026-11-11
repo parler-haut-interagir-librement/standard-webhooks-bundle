@@ -29,7 +29,7 @@ answers that webhook endpoint with a server error, never another page of the app
 
 `allow_private_networks` and `allow_plain_http` guard the sender against server-side request forgery
 ([sending.md](sending.md#receiver-urls-given-by-others)). Turn them on only for receivers the application itself
-trusts, such as a test kernel at `http://localhost`.
+trusts, such as a test kernel at `http://app.localhost`.
 
 | Refused at build time | Message |
 |---|---|

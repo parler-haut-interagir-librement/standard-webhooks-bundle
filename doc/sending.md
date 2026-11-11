@@ -35,10 +35,14 @@ let that party make the application send requests inside its own network: to a c
 The sender therefore:
 
 - sends to `https` URLs only; another scheme is a `DeliveryFailed` that is not retryable, `the receiver's URL is not
-  an https URL`. `allow_plain_http: true` accepts `http` too;
-- wraps the HTTP client in Symfony's `NoPrivateNetworkHttpClient`, which refuses a host that is, or resolves to, a
-  loopback, private, link-local or reserved address, before anything is sent: a `DeliveryFailed` without a status,
-  whose message says the host `is blocked`. `allow_private_networks: true` removes the guard; it needs
+  an https URL to a host name`. `allow_plain_http: true` accepts `http` too;
+- reads the URL with phil/url, as a browser reads it, and sends it in its canonical form: a URL with a user name or a
+  password, or whose host is an IP address — dotted, a single number such as `2130706433`, IPv6 — or a single name
+  such as `metadata`, is refused the same way, before any request, whatever the configuration. Name a receiver of
+  the internal network by a host name, `hooks.internal.example`, or under `.localhost`;
+- wraps the HTTP client in Symfony's `NoPrivateNetworkHttpClient`, which refuses a host that resolves to a loopback,
+  private, link-local or reserved address, before anything is sent: a `DeliveryFailed` without a status, whose
+  message says the host `is blocked`. `allow_private_networks: true` removes the guard; it needs
   `symfony/http-client`, which the `http_client` service already brings.
 
 Validate a URL when it is registered, too, and never relay a `DeliveryFailed` message to the party that registered

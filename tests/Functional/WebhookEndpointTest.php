@@ -133,15 +133,15 @@ final class WebhookEndpointTest extends FunctionalTestCase
     public function testWhatTheSenderSendsTheReceiverProcesses(): void
     {
         $sender = $this->service(WebhookSender::class, WebhookSender::class);
-        $id = $sender->send('http://localhost/webhooks', self::BODY);
+        $id = $sender->send('http://app.localhost/webhooks', self::BODY);
 
         self::assertSame([$id->value], $this->claimed());
         self::assertSame(1, $this->keys()->refreshes);
-        self::assertSame($id, $sender->send('http://localhost/webhooks', self::BODY, $id));
+        self::assertSame($id, $sender->send('http://app.localhost/webhooks', self::BODY, $id));
         self::assertSame([$id->value], $this->claimed());
 
         try {
-            $sender->send('http://localhost/webhooks', str_replace('invoice.paid', 'invoice.voided', self::BODY), WebhookId::fromString('msg_2'));
+            $sender->send('http://app.localhost/webhooks', str_replace('invoice.paid', 'invoice.voided', self::BODY), WebhookId::fromString('msg_2'));
             self::fail('An unprocessed delivery was acknowledged.');
         } catch (DeliveryFailed $deliveryFailed) {
             self::assertSame([422, 'msg_2'], [$deliveryFailed->status, $deliveryFailed->id->value]);

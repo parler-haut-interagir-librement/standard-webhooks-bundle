@@ -1,4 +1,4 @@
-<!-- phil-dev source-sha256=236930f02df36458be11ffb17ff3e3c1c83e62d6bf4de10a28eaddb4906ffbb6 -->
+<!-- phil-dev source-sha256=2159ab5587445f1e0aabf4ffef930defeb87ebf5226ef0a7f292c1ac94a0c00f -->
 # Envoi
 
 `WebhookSender::send()` fait une tentative d'une livraison : le corps, signé avec les clés de signature configurées à
@@ -37,10 +37,15 @@ réseau : vers un point de terminaison de métadonnées d'infonuagique (`169.254
 code d'état ou l'erreur de transport revenant comme réponse. L'expéditeur, par conséquent :
 
 - n'envoie qu'à des URL `https` ; un autre schéma donne un `DeliveryFailed` sans nouvelle tentative possible,
-  `the receiver's URL is not an https URL`. `allow_plain_http: true` accepte aussi `http` ;
-- enveloppe le client HTTP dans le `NoPrivateNetworkHttpClient` de Symfony, qui refuse un hôte qui est, ou se résout
-  en, une adresse de bouclage, privée, de lien local ou réservée, avant que rien ne soit envoyé : un `DeliveryFailed`
-  sans état, dont le message dit que l'hôte `is blocked`. `allow_private_networks: true` retire la protection ; il a
+  `the receiver's URL is not an https URL to a host name`. `allow_plain_http: true` accepte aussi `http` ;
+- lit l'URL avec phil/url, comme un navigateur la lit, et l'envoie sous sa forme canonique : une URL avec un nom
+  d'utilisateur ou un mot de passe, ou dont l'hôte est une adresse IP (avec des points, en un seul nombre comme
+  `2130706433`, en IPv6) ou un seul nom comme `metadata`, est refusée de la même façon, avant toute requête, quelle
+  que soit la configuration. Nommez un récepteur du réseau interne par un nom d'hôte, `hooks.internal.example`, ou
+  sous `.localhost` ;
+- enveloppe le client HTTP dans le `NoPrivateNetworkHttpClient` de Symfony, qui refuse un hôte qui se résout en une
+  adresse de bouclage, privée, de lien local ou réservée, avant que rien ne soit envoyé : un `DeliveryFailed` sans
+  état, dont le message dit que l'hôte `is blocked`. `allow_private_networks: true` retire la protection ; il a
   besoin de `symfony/http-client`, que le service `http_client` apporte déjà.
 
 Validez aussi une URL quand elle est enregistrée, et ne relayez jamais le message d'un `DeliveryFailed` au tiers qui
