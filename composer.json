@@ -1,0 +1,67 @@
+{
+    "name": "phil/standard-webhooks-bundle",
+    "description": "Standard Webhooks for Symfony, on phil/standard-webhooks: configured signing and verification keys, the verified delivery as a controller argument, a signed sender over the HTTP client, processed ids in a Doctrine table, and a key generator",
+    "license": "MIT",
+    "type": "symfony-bundle",
+    "keywords": [
+        "ed25519",
+        "hmac",
+        "standard-webhooks",
+        "symfony-bundle",
+        "webhooks"
+    ],
+    "authors": [
+        {
+            "name": "Philippe Gamache",
+            "email": "philippe@ph-il.ca",
+            "homepage": "https://github.com/ph-il",
+            "role": "Developer"
+        }
+    ],
+    "homepage": "https://ph-il.ca",
+    "require": {
+        "php": ">=8.5",
+        "phil/standard-webhooks": "^0.1@dev",
+        "psr/clock": "^1.0",
+        "symfony/config": "^8.2",
+        "symfony/dependency-injection": "^8.2",
+        "symfony/http-foundation": "^8.2",
+        "symfony/http-kernel": "^8.2"
+    },
+    "require-dev": {
+        "doctrine/dbal": "^4.5",
+        "doctrine/doctrine-bundle": "^3.3",
+        "doctrine/orm": "^3.7",
+        "phpunit/phpunit": "^13.4",
+        "psr/log": "^3.0",
+        "symfony/clock": "^8.2",
+        "symfony/console": "^8.2",
+        "symfony/event-dispatcher": "^8.2",
+        "symfony/framework-bundle": "^8.2",
+        "symfony/http-client": "^8.2",
+        "symfony/http-client-contracts": "^3.6",
+        "symfony/routing": "^8.2"
+    },
+    "suggest": {
+        "doctrine/dbal": "To keep the processed ids in a table",
+        "symfony/console": "For phil:standard-webhooks:generate-key",
+        "symfony/http-client": "To send webhooks with WebhookSender"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "autoload": {
+        "psr-4": {
+            "Phil\\StandardWebhooksBundle\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Phil\\StandardWebhooksBundle\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.1.x-dev"
+        }
+    }
+}
