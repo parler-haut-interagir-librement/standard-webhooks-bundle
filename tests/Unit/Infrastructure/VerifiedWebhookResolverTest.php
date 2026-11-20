@@ -6,6 +6,7 @@ namespace Phil\StandardWebhooksBundle\Tests\Unit\Infrastructure;
 
 use ArrayObject;
 use DateTimeImmutable;
+use InvalidArgumentException;
 use Phil\StandardWebhooks\Exception\InvalidWebhookValue;
 use Phil\StandardWebhooks\Exception\WebhookRejected;
 use Phil\StandardWebhooks\FixedKeys;
@@ -108,7 +109,119 @@ final class VerifiedWebhookResolverTest extends TestCase
         }
     }
 
-    private function resolver(HmacSecret $secret, DateTimeImmutable $now): VerifiedWebhookResolver
+    public function testTheBodyIsBoundedToOneMebibyteByDefault(): void
+    {
+        self::assertSame(1_048_576, VerifiedWebhookResolver::MAX_BODY_BYTES);
+
+        $secret = HmacSecret::generate();
+        $request = Request::create('/webhooks', 'POST', content: str_repeat('a', 1_048_577));
+        $request->headers->remove('Content-Length');
+
+        try {
+            $this->resolver($secret, new DateTimeImmutable('2026-11-03 12:00'))->resolve($request, $this->argument(VerifiedWebhook::class));
+            self::fail('A body of 1 MiB and 1 byte was read.');
+        } catch (HttpException $httpException) {
+            self::assertSame([413, 'The body of a webhook is at most 1048576 bytes.'], [$httpException->getStatusCode(), $httpException->getMessage()]);
+        }
+    }
+
+    public function testABodyAtTheLimitIsVerifiedAndOneBytePastItIsRefused(): void
+    {
+        $secret = HmacSecret::generate();
+        $now = new DateTimeImmutable('2026-11-03 12:00');
+        $length = \strlen(self::BODY);
+
+        foreach ([null, (string) $length] as $header) {
+            $request = $this->request($secret, $now);
+            $this->contentLength($request, $header);
+
+            self::assertCount(1, $this->resolver($secret, $now, $length)->resolve($request, $this->argument(VerifiedWebhook::class)));
+        }
+
+        foreach ([null, (string) $length, (string) ($length - 1), 'abc'] as $header) {
+            $request = $this->request($secret, $now);
+            $this->contentLength($request, $header);
+
+            try {
+                $this->resolver($secret, $now, $length - 1)->resolve($request, $this->argument(VerifiedWebhook::class));
+                self::fail('A body past the limit was verified.');
+            } catch (HttpException $httpException) {
+                self::assertSame(413, $httpException->getStatusCode(), (string) $header);
+                self::assertSame(\sprintf('The body of a webhook is at most %d bytes.', $length - 1), $httpException->getMessage());
+            }
+        }
+    }
+
+    public function testAContentLengthAboveTheLimitIsRefusedBeforeTheBodyIsRead(): void
+    {
+        $secret = HmacSecret::generate();
+        $now = new DateTimeImmutable('2026-11-03 12:00');
+
+        foreach (['1048577', '99999999999999999999999'] as $header) {
+            $request = $this->request($secret, $now);
+            $this->contentLength($request, $header);
+
+            try {
+                $this->resolver($secret, $now, 1_048_576)->resolve($request, $this->argument(VerifiedWebhook::class));
+                self::fail('A declared length past the limit was read.');
+            } catch (HttpException $httpException) {
+                self::assertSame(413, $httpException->getStatusCode(), $header);
+            }
+        }
+    }
+
+    public function testOnlyADeclaredLengthOfDigitsAloneCountsBeforeTheBodyIsRead(): void
+    {
+        $secret = HmacSecret::generate();
+        $now = new DateTimeImmutable('2026-11-03 12:00');
+        $length = \strlen(self::BODY);
+
+        foreach ([\sprintf('%d abc', $length + 1), \sprintf('%dabc', $length + 1), \sprintf(' %d', $length + 1), \sprintf('%d%s', $length + 1, "\n")] as $header) {
+            $request = $this->request($secret, $now);
+            $this->contentLength($request, $header);
+
+            self::assertCount(1, $this->resolver($secret, $now, $length)->resolve($request, $this->argument(VerifiedWebhook::class)), $header);
+        }
+    }
+
+    public function testNoMoreThanOneBytePastTheLimitIsRead(): void
+    {
+        $secret = HmacSecret::generate();
+        $stream = fopen('php://memory', 'r+');
+        self::assertIsResource($stream);
+        fwrite($stream, str_repeat('a', 50));
+        rewind($stream);
+        $request = new Request(content: $stream);
+
+        try {
+            $this->resolver($secret, new DateTimeImmutable('2026-11-03 12:00'), 10)->resolve($request, $this->argument(VerifiedWebhook::class));
+            self::fail('A body past the limit was verified.');
+        } catch (HttpException) {
+            self::assertSame(11, ftell($stream));
+        }
+    }
+
+    public function testTheLimitIsAtLeastOneByte(): void
+    {
+        $receiver = new WebhookReceiver(new FixedKeys(HmacSecret::generate()), Tolerance::ofSeconds(60));
+        self::assertCount(0, new VerifiedWebhookResolver($receiver, new NativeClock(), 1)->resolve(Request::create('/'), $this->argument('string')));
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageIsOrContains('The largest body of a webhook is at least 1 byte.');
+
+        new VerifiedWebhookResolver($receiver, new NativeClock(), 0);
+    }
+
+    private function contentLength(Request $request, ?string $length): void
+    {
+        $request->headers->remove('Content-Length');
+
+        if (null !== $length) {
+            $request->headers->set('Content-Length', $length);
+        }
+    }
+
+    private function resolver(HmacSecret $secret, DateTimeImmutable $now, int $maxBodyBytes = VerifiedWebhookResolver::MAX_BODY_BYTES): VerifiedWebhookResolver
     {
         $clock = new readonly class($now) implements ClockInterface {
             public function __construct(
@@ -122,7 +235,7 @@ final class VerifiedWebhookResolverTest extends TestCase
             }
         };
 
-        return new VerifiedWebhookResolver(new WebhookReceiver(new FixedKeys($secret), Tolerance::ofSeconds(300)), $clock);
+        return new VerifiedWebhookResolver(new WebhookReceiver(new FixedKeys($secret), Tolerance::ofSeconds(300)), $clock, $maxBodyBytes);
     }
 
     private function request(HmacSecret $secret, DateTimeImmutable $signedAt): Request

@@ -17,6 +17,7 @@ use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Types\Type;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\Event\GenerateSchemaEventArgs;
+use InvalidArgumentException;
 use Phil\StandardWebhooks\WebhookId;
 use Phil\StandardWebhooksBundle\Infrastructure\Doctrine\DbalProcessedWebhooks;
 use Phil\StandardWebhooksBundle\Infrastructure\Doctrine\ProcessedWebhookSchemaListener;
@@ -50,6 +51,7 @@ final class DoctrineTest extends TestCase
     {
         $connection = $this->connection();
         $connection->executeStatement('INSERT INTO phil_standard_webhooks_processed (id, processed_at) VALUES (?, ?)', ['msg_1', '2026-11-03 12:00:00']);
+        $connection->executeStatement('INSERT INTO phil_standard_webhooks_processed (receiver, id, processed_at) VALUES (?, ?, ?)', ['partner', 'msg_3', '2026-11-03 12:00:00']);
 
         $processed = new DbalProcessedWebhooks($connection);
         $plain = new ReflectionProperty(Connection::class, 'platform');
@@ -57,14 +59,62 @@ final class DoctrineTest extends TestCase
 
         self::assertFalse($processed->claim(WebhookId::fromString('msg_1'), new DateTimeImmutable()));
         self::assertTrue($processed->claim(WebhookId::fromString('msg_2'), new DateTimeImmutable()));
+        self::assertTrue($processed->claim(WebhookId::fromString('msg_3'), new DateTimeImmutable()), "The id of another receiver is not this one's.");
+        self::assertFalse($processed->forReceiver('partner')->claim(WebhookId::fromString('msg_3'), new DateTimeImmutable()));
+    }
+
+    public function testEachReceiverClaimsItsIdsApart(): void
+    {
+        $connection = $this->connection();
+        $processed = new DbalProcessedWebhooks($connection, 'shop');
+        $partner = $processed->forReceiver('partner.v2-b_1');
+        $at = new DateTimeImmutable('2026-11-03 12:00 UTC');
+
+        self::assertSame(['shop', 'partner.v2-b_1', 'default'], [$processed->receiver, $partner->receiver, new DbalProcessedWebhooks($connection)->receiver]);
+        self::assertTrue($partner->claim(WebhookId::fromString('msg_1'), $at), 'A sender that sends the id of another first has nothing of it ignored.');
+        self::assertTrue($processed->claim(WebhookId::fromString('msg_1'), $at));
+        self::assertFalse($processed->claim(WebhookId::fromString('msg_1'), $at));
+        self::assertFalse($partner->claim(WebhookId::fromString('msg_1'), $at));
+        self::assertSame([['partner.v2-b_1', 'msg_1'], ['shop', 'msg_1']], $connection->fetchAllNumeric('SELECT receiver, id FROM phil_standard_webhooks_processed ORDER BY receiver'));
+        self::assertSame(2, $processed->purge($at->modify('+1 second')), 'The purge forgets the ids of every receiver.');
+    }
+
+    public function testTheMessageQuotesAtMostTheFirstHundredBytesOfTheName(): void
+    {
+        try {
+            new DbalProcessedWebhooks($this->connection(false), str_repeat('a', 150));
+            self::fail('A name of 150 bytes was taken for the name of a receiver.');
+        } catch (InvalidArgumentException $invalidArgumentException) {
+            self::assertSame(\sprintf('The name of a receiver holds 1 to 64 letters, digits, "_", "." or "-"; "%s" does not.', str_repeat('a', 100)), $invalidArgumentException->getMessage());
+        }
+    }
+
+    public function testTheNameOfAReceiverIsBounded(): void
+    {
+        $connection = $this->connection(false);
+        self::assertSame(str_repeat('a', 64), new DbalProcessedWebhooks($connection, str_repeat('a', 64))->receiver);
+
+        foreach (['', str_repeat('a', 65), 'shop partner', "shop\n", 'café', 'a/b'] as $name) {
+            try {
+                new DbalProcessedWebhooks($connection, $name);
+                self::fail(\sprintf('"%s" was taken for the name of a receiver.', $name));
+            } catch (InvalidArgumentException $invalidArgumentException) {
+                self::assertStringStartsWith('The name of a receiver holds 1 to 64 letters, digits, "_", "." or "-"; "', $invalidArgumentException->getMessage());
+            }
+        }
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageIsOrContains('"shop\n" does not.');
+
+        new DbalProcessedWebhooks($connection)->forReceiver("shop\n");
     }
 
     public function testEachPlatformIgnoresADuplicateItsOwnWay(): void
     {
-        $values = 'phil_standard_webhooks_processed (id, processed_at) VALUES (?, ?)';
+        $values = 'phil_standard_webhooks_processed (receiver, id, processed_at) VALUES (?, ?, ?)';
 
         self::assertSame([
-            'INSERT INTO '.$values.' ON CONFLICT (id) DO NOTHING',
+            'INSERT INTO '.$values.' ON CONFLICT (receiver, id) DO NOTHING',
             'INSERT IGNORE INTO '.$values,
             'INSERT IGNORE INTO '.$values,
             'INSERT OR IGNORE INTO '.$values,
@@ -81,13 +131,16 @@ final class DoctrineTest extends TestCase
         foreach ([new MySQLPlatform(), new MariaDBPlatform()] as $platform) {
             $sql = implode(';', $platform->getCreateTablesSQL(ProcessedWebhookTable::configure(Schema::editor()->create(), $platform)->getTables()));
 
-            self::assertStringContainsString('id VARCHAR(255) CHARACTER SET ascii NOT NULL COLLATE `ascii_bin`', $sql, $platform::class);
+            self::assertStringContainsString(' id VARCHAR(255) CHARACTER SET ascii NOT NULL COLLATE `ascii_bin`', $sql, $platform::class);
+            self::assertStringContainsString("receiver VARCHAR(64) CHARACTER SET ascii DEFAULT 'default' NOT NULL COLLATE `ascii_bin`", $sql, $platform::class);
         }
 
         foreach ([new PostgreSQLPlatform(), new SQLitePlatform(), null] as $platform) {
-            $column = ProcessedWebhookTable::configure(Schema::editor()->create(), $platform)->getTable(ProcessedWebhookTable::NAME)->getColumn('id');
+            $table = ProcessedWebhookTable::configure(Schema::editor()->create(), $platform)->getTable(ProcessedWebhookTable::NAME);
 
-            self::assertSame([null, null], [$column->getCharset(), $column->getCollation()]);
+            foreach (['id', 'receiver'] as $name) {
+                self::assertSame([null, null], [$table->getColumn($name)->getCharset(), $table->getColumn($name)->getCollation()]);
+            }
         }
     }
 
@@ -102,6 +155,7 @@ final class DoctrineTest extends TestCase
         new ProcessedWebhookSchemaListener($connection)->postGenerateSchema($event);
 
         self::assertSame('ascii_bin', $event->getSchema()->getTable(ProcessedWebhookTable::NAME)->getColumn('id')->getCollation());
+        self::assertSame('ascii_bin', $event->getSchema()->getTable(ProcessedWebhookTable::NAME)->getColumn('receiver')->getCollation());
     }
 
     public function testTheTableJoinsTheSchemaOfItsConnection(): void
@@ -123,7 +177,8 @@ final class DoctrineTest extends TestCase
         $schema = $event->getSchema();
         $table = $schema->getTable(ProcessedWebhookTable::NAME);
         self::assertSame([255, true, 'datetime_immutable'], [$table->getColumn('id')->getLength(), $table->getColumn('processed_at')->getNotnull(), Type::lookupName($table->getColumn('processed_at')->getType())]);
-        self::assertSame(['id'], array_map(static fn (object $name): string => $name->toString(), $table->getPrimaryKeyConstraint()?->getColumnNames() ?? []));
+        self::assertSame([64, true, 'default'], [$table->getColumn('receiver')->getLength(), $table->getColumn('receiver')->getNotnull(), $table->getColumn('receiver')->getDefault()]);
+        self::assertSame(['receiver', 'id'], array_map(static fn (object $name): string => $name->toString(), $table->getPrimaryKeyConstraint()?->getColumnNames() ?? []));
         self::assertTrue($table->hasIndex('phil_standard_webhooks_processed_processed_at'));
         self::assertSame($schema, ProcessedWebhookTable::configure($schema));
         self::assertCount(1, $schema->getTables());

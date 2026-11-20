@@ -42,6 +42,17 @@ return [
             ],
         ],
     ],
+    'infection' => [
+        'mutators' => [
+            // A declared length of digits alone is compared to the limit: PHP compares a numeric string to an integer
+            // by value, so the cast changes no outcome.
+            'CastInt' => [
+                'ignoreSourceCodeByRegex' => [
+                    'if \\(null !== \\$length && 1 === preg_match\\(.*\\) && \\(int\\) \\$length > \\$this->maxBodyBytes\\) \\{',
+                ],
+            ],
+        ],
+    ],
     // The package is released from its own repository: its CHANGELOG uses every section.
     'docs' => ['public' => true],
 ];

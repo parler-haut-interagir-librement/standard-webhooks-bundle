@@ -10,6 +10,7 @@ use Phil\StandardWebhooksBundle\Application\SigningKeys;
 use Phil\StandardWebhooksBundle\Infrastructure\Console\GenerateKeyCommand;
 use Phil\StandardWebhooksBundle\Infrastructure\Doctrine\DbalProcessedWebhooks;
 use Phil\StandardWebhooksBundle\Infrastructure\Doctrine\ProcessedWebhookSchemaListener;
+use Phil\StandardWebhooksBundle\Infrastructure\Doctrine\ProcessedWebhookTable;
 use Phil\StandardWebhooksBundle\Infrastructure\Http\VerifiedWebhookResolver;
 use Phil\StandardWebhooksBundle\Infrastructure\Http\WebhookSender;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
@@ -61,6 +62,19 @@ final class PhilStandardWebhooksBundle extends AbstractBundle
                     ->validate()
                         ->ifTrue(static fn (mixed $audience): bool => '' === $audience)
                         ->thenInvalid('The audience is a name, or null to accept any: %s.')
+                    ->end()
+                ->end()
+                ->integerNode('max_body_bytes')
+                    ->info('The largest body of a delivery, in bytes, read before it is verified; a larger one is answered 413 unread. 1 MiB by default.')
+                    ->min(1)
+                    ->defaultValue(VerifiedWebhookResolver::MAX_BODY_BYTES)
+                ->end()
+                ->scalarNode('receiver')
+                    ->info('The name of the configured receiver, which keys its processed ids apart from those of the other receivers, one per sender, that share the table: 1 to 64 letters, digits, "_", "." or "-".')
+                    ->defaultValue(ProcessedWebhookTable::DEFAULT_RECEIVER)
+                    ->validate()
+                        ->ifTrue(static fn (mixed $receiver): bool => !\is_string($receiver) || 1 !== preg_match(ProcessedWebhookTable::RECEIVER_PATTERN, $receiver))
+                        ->thenInvalid('The receiver is a name of 1 to 64 letters, digits, "_", "." or "-": %s.')
                     ->end()
                 ->end()
                 ->scalarNode('connection')
@@ -120,7 +134,7 @@ final class PhilStandardWebhooksBundle extends AbstractBundle
         // Before the resolvers that would give a `VerifiedWebhook` argument another value: the request attribute of
         // the same name, the entity Doctrine would look up.
         $services->set(VerifiedWebhookResolver::class)
-            ->args([new ServiceClosureArgument(new Reference(Library::RECEIVER)), $clock])
+            ->args([new ServiceClosureArgument(new Reference(Library::RECEIVER)), $clock, $config['max_body_bytes']])
             ->tag('controller.argument_value_resolver', ['name' => 'phil_standard_webhooks', 'before' => ['argument_resolver.request_attribute', 'doctrine.orm.entity_value_resolver']]);
         $services->set(WebhookSender::class)
             ->args([new Reference('http_client', ContainerInterface::NULL_ON_INVALID_REFERENCE), new Reference(Library::SIGNER), new Reference(SigningKeys::class), $clock])
@@ -135,7 +149,7 @@ final class PhilStandardWebhooksBundle extends AbstractBundle
 
         if (\is_string($config['connection'])) {
             $connection = new Reference(\sprintf('doctrine.dbal.%s_connection', $config['connection']));
-            $services->set(DbalProcessedWebhooks::class)->args([$connection]);
+            $services->set(DbalProcessedWebhooks::class)->args([$connection, $config['receiver']]);
             $services->alias(Library::PROCESSED_WEBHOOKS, DbalProcessedWebhooks::class)->public();
             $services->set(ProcessedWebhookSchemaListener::class)
                 ->args([$connection])

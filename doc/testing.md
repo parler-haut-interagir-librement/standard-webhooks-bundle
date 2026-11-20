@@ -19,7 +19,9 @@ is a development requirement, the suite is skipped.
 vendor/bin/phpunit packages/standard-webhooks-bundle/tests
 ```
 
-An integration test, `MySqlProcessedWebhooksTest`, claims two ids that differ by their case on a real MySQL server,
-when `PHIL_TEST_MYSQL_URL` names one; it is skipped otherwise.
+Two integration tests, `MySqlProcessedWebhooksTest` and `PostgreSqlProcessedWebhooksTest`, claim two ids that differ
+by their case on a real server, and the first reads the `ascii_bin` collation of the id from MySQL's
+`information_schema`. They run when `PHIL_TEST_MYSQL_URL` and `PHIL_TEST_POSTGRESQL_URL` name the servers, as
+`phil-dev services test` sets them, and are skipped otherwise.
 
 The protocol itself is tested in `phil/standard-webhooks`, against the RFC 8032 and Standard Webhooks vectors.

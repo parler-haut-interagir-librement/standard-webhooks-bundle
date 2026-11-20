@@ -1,4 +1,4 @@
-<!-- phil-dev source-sha256=213f1da4fac258d2a11d7459c9eaf3a7ec79b594919834bbe0a4ffebd14aea9a -->
+<!-- phil-dev source-sha256=a2f54073cdf5d44d7bbb98780d743b86d361e6836daf9026c20dcb257a8bc7a8 -->
 # Tests
 
 | Domaine | Ce qui est couvert |
@@ -20,8 +20,10 @@ installé seul, là où FrameworkBundle est un prérequis de développement, la 
 vendor/bin/phpunit packages/standard-webhooks-bundle/tests
 ```
 
-Un test d'intégration, `MySqlProcessedWebhooksTest`, revendique deux identifiants qui ne diffèrent que par la casse
-sur un vrai serveur MySQL, quand `PHIL_TEST_MYSQL_URL` en nomme un ; il est sauté sinon.
+Deux tests d'intégration, `MySqlProcessedWebhooksTest` et `PostgreSqlProcessedWebhooksTest`, revendiquent deux
+identifiants qui ne diffèrent que par la casse sur un vrai serveur, et le premier lit la collation `ascii_bin` de
+l'identifiant dans l'`information_schema` de MySQL. Ils s'exécutent quand `PHIL_TEST_MYSQL_URL` et
+`PHIL_TEST_POSTGRESQL_URL` nomment les serveurs, comme les fixe `phil-dev services test`, et sont sautés sinon.
 
 Le protocole lui-même est testé dans `phil/standard-webhooks`, contre les vecteurs de la RFC 8032 et de Standard
 Webhooks.

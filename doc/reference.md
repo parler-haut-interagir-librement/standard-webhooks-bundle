@@ -5,11 +5,11 @@
 | `PhilStandardWebhooksBundle` | `final class`, `AbstractBundle` | Alias `phil_standard_webhooks`; the configuration and the services |
 | `Application\SigningKeys` | `final readonly class` | The configured signing keys: the current one, and the others of a rotation |
 | `Application\Library` | `final class` | The library's types the bundle registers, by name |
-| `Infrastructure\Http\VerifiedWebhookResolver` | controller argument resolver | A `VerifiedWebhook` argument, verified; `400` or `401`; the receiver built for such an argument only |
+| `Infrastructure\Http\VerifiedWebhookResolver` | controller argument resolver | A `VerifiedWebhook` argument, verified; `413`, `400` or `401`; the body bounded before it is read whole; the receiver built for such an argument only |
 | `Infrastructure\Http\WebhookSender` | service | One signed attempt over Symfony's HTTP client, to `https` URLs outside private networks unless allowed |
 | `Infrastructure\Http\DeliveryFailed` | exception, a `WebhookException` | A delivery not acknowledged or refused: its id, the status if any, and whether it is `retryable` |
-| `Infrastructure\Doctrine\DbalProcessedWebhooks` | `ProcessedWebhookRepository` | The processed ids in their table; `purge()` |
-| `Infrastructure\Doctrine\ProcessedWebhookTable` | schema | `phil_standard_webhooks_processed` |
+| `Infrastructure\Doctrine\DbalProcessedWebhooks` | `ProcessedWebhookRepository` | The processed ids of one receiver in their table; `forReceiver()`, `purge()` |
+| `Infrastructure\Doctrine\ProcessedWebhookTable` | schema | `phil_standard_webhooks_processed`, keyed by the receiver and the id |
 | `Infrastructure\Doctrine\ProcessedWebhookSchemaListener` | Doctrine listener | The table in the ORM's schema |
 | `Infrastructure\Console\GenerateKeyCommand` | console command | `phil:standard-webhooks:generate-key` |
 

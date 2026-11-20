@@ -32,9 +32,9 @@ without aborting the processing transaction, so de-duplication and the work it g
 |---|---|
 | [Installation](doc/installation.md) | Requirements, registering, the table. |
 | [Configuration](doc/configuration.md) | Every key, generating keys, the services, keys that change. |
-| [Receiving](doc/receiving.md) | The controller argument, the answers, a complete endpoint. |
+| [Receiving](doc/receiving.md) | The controller argument, the size of a body, the answers, a complete endpoint, several senders. |
 | [Sending](doc/sending.md) | `WebhookSender`, retries, failures, the guard on receiver URLs. |
-| [Storage](doc/storage.md) | The table of processed ids, claiming, purging. |
+| [Storage](doc/storage.md) | The table of processed ids, one receiver apart from another, claiming, purging, upgrading from 0.1. |
 | [Extension points](doc/extension-points.md) | What an application implements, configures, replaces or relies on. |
 | [Testing](doc/testing.md) | How the bundle is tested. |
 | [Reference](doc/reference.md) | Every type of the bundle. |

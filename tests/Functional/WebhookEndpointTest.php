@@ -109,6 +109,23 @@ final class WebhookEndpointTest extends FunctionalTestCase
         self::assertSame([], $this->claimed());
     }
 
+    public function testABodyPastTheLimitIsAnsweredTooLargeBeforeAnyVerification(): void
+    {
+        $body = str_replace('inv_1', str_repeat('a', 1_048_576), self::BODY);
+
+        $response = $this->deliver($this->sign($body, HmacSecret::fromString(TestKernel::HMAC_SECRET)), $body);
+
+        self::assertSame(413, $response->getStatusCode());
+        self::assertSame(0, $this->keys()->refreshes, 'Nothing is verified.');
+        self::assertSame([], $this->claimed());
+    }
+
+    public function testTheIdsAreClaimedUnderTheConfiguredReceiver(): void
+    {
+        self::assertSame(204, $this->deliver($this->sign(self::BODY, HmacSecret::fromString(TestKernel::HMAC_SECRET)), self::BODY)->getStatusCode());
+        self::assertSame(['default'], $this->connection()->fetchFirstColumn(\sprintf('SELECT receiver FROM %s', ProcessedWebhookTable::NAME)));
+    }
+
     /**
      * A verified delivery of a type the receiver does not process is never acknowledged, so the sender retries it.
      */

@@ -1,6 +1,6 @@
 {
     "name": "phil/standard-webhooks-bundle",
-    "description": "Standard Webhooks for Symfony, on phil/standard-webhooks: configured signing and verification keys, the verified delivery as a controller argument, a signed sender over the HTTP client, processed ids in a Doctrine table, and a key generator",
+    "description": "Standard Webhooks in Symfony: verified incoming webhooks handed to your controllers, signed webhooks sent out, and each delivery processed only once.",
     "license": "MIT",
     "type": "symfony-bundle",
     "keywords": [

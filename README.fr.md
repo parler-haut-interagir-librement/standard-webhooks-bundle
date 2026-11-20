@@ -1,4 +1,4 @@
-<!-- phil-dev source-sha256=ed47cd1bb0bfb3396862ed933c8364bdd7c2dfadc9c9b2cd888d918b10ffe28a -->
+<!-- phil-dev source-sha256=061b4744dbfa5dce6f92698e0220edd95712949770bfdd86ae1f783633819cdd -->
 # phil/standard-webhooks-bundle
 
 **Des livraisons de webhooks vérifiées en arguments de contrôleur, et des webhooks signés envoyés depuis Symfony.**
@@ -34,9 +34,9 @@ travail qu'elle protège partagent ainsi une même transaction.
 |---|---|
 | [Installation](doc/fr/installation.md) | Prérequis, enregistrement, la table. |
 | [Configuration](doc/fr/configuration.md) | Chaque clé, la génération de clés, les services, les clés qui changent. |
-| [Réception](doc/fr/receiving.md) | L'argument de contrôleur, les réponses, un point de terminaison complet. |
+| [Réception](doc/fr/receiving.md) | L'argument de contrôleur, la taille d'un corps, les réponses, un point de terminaison complet, plusieurs expéditeurs. |
 | [Envoi](doc/fr/sending.md) | `WebhookSender`, les nouvelles tentatives, les échecs, la protection sur les URL des récepteurs. |
-| [Stockage](doc/fr/storage.md) | La table des identifiants traités, la revendication, la purge. |
+| [Stockage](doc/fr/storage.md) | La table des identifiants traités, un récepteur à part des autres, la revendication, la purge, la mise à niveau depuis la 0.1. |
 | [Points d'extension](doc/fr/extension-points.md) | Ce qu'une application implémente, configure, remplace ou utilise. |
 | [Tests](doc/fr/testing.md) | Comment le bundle est testé. |
 | [Référence](doc/fr/reference.md) | Chaque type du bundle. |

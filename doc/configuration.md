@@ -12,6 +12,12 @@ phil_standard_webhooks:
     tolerance: 300
     # This receiver's name: an envelope must give it as its "audience". null, the default, accepts any.
     audience: shop
+    # The largest body of a delivery, in bytes, read before it is verified: a larger one is answered 413 unread.
+    # 1048576 (1 MiB) when left out.
+    max_body_bytes: 1048576
+    # The name of the configured receiver, which keys its processed ids apart from those of the other receivers, one
+    # per sender, that share the table. "default" when left out.
+    receiver: default
     # The Doctrine connection that keeps the processed ids; null keeps them elsewhere. "default" when left out,
     # null without DoctrineBundle.
     connection: default
@@ -29,6 +35,9 @@ environment variables; a key that cannot be read fails the first delivery that n
 read by the first request whose controller takes a `VerifiedWebhook` argument, and by no other: an unreadable one
 answers that webhook endpoint with a server error, never another page of the application.
 
+`audience` and `receiver` name different things: `audience` is this application, as the envelopes name it; `receiver`
+is the configured receiver, the one sender its keys verify, under which its ids are claimed.
+
 `allow_private_networks` and `allow_plain_http` guard the sender against server-side request forgery
 ([sending.md](sending.md#receiver-urls-given-by-others)). Turn them on only for receivers the application itself
 trusts, such as a test kernel at `http://localhost` with `allow_localhost`.
@@ -38,6 +47,8 @@ trusts, such as a test kernel at `http://localhost` with `allow_localhost`.
 | A key the bundle does not know | `Unrecognized option "…" under "phil_standard_webhooks"` |
 | `audience: ''` | `The audience is a name, or null to accept any` |
 | `tolerance: 0` | `Should be greater than or equal to 1` |
+| `max_body_bytes: 0` | `Should be greater than or equal to 1` |
+| `receiver: 'shop partner'`, or longer than 64 bytes | `The receiver is a name of 1 to 64 letters, digits, "_", "." or "-"` |
 
 ## Generating keys
 
@@ -57,7 +68,7 @@ The command prints the keys once and keeps nothing: put the secret in the applic
 | `Phil\StandardWebhooks\Signer`, `Phil\StandardWebhooks\Verifier` | The library's own |
 | `Phil\StandardWebhooksBundle\Application\SigningKeys` | The configured signing keys |
 | `Phil\StandardWebhooksBundle\Infrastructure\Http\WebhookSender` | Public; over the `http_client` service |
-| `Phil\StandardWebhooks\ProcessedWebhookRepository` | Public; an alias of `DbalProcessedWebhooks`, with a connection |
+| `Phil\StandardWebhooks\ProcessedWebhookRepository` | Public; an alias of `DbalProcessedWebhooks`, with a connection and the configured `receiver` |
 
 ## Keys that change
 

@@ -138,6 +138,10 @@ final class WebhookSenderTest extends TestCase
         yield 'loopback' => ['127.0.0.1'];
         yield 'IPv6 loopback' => ['::1'];
         yield 'private network' => ['10.0.0.7'];
+        yield 'private network in an IPv4-mapped IPv6 address' => ['::ffff:10.0.0.7'];
+        yield 'private network in a 6to4 IPv6 address' => ['2002:a00:7::1'];
+        yield 'private network in a Teredo IPv6 address' => ['2001:0:4136:e378:8000:63bf:f5ff:fff8'];
+        yield 'private network in a NAT64 IPv6 address' => ['64:ff9b::a00:7'];
     }
 
     #[DataProvider('privateAddresses')]

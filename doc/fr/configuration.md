@@ -1,4 +1,4 @@
-<!-- phil-dev source-sha256=6a6d6b81f478c200561f6b17662f16fd996c122e9573a2e9b9532b975f245895 -->
+<!-- phil-dev source-sha256=8a2f0fea4a83248f09653587b6c37cfe890b45cc56572f0092bf90283adc4927 -->
 # Configuration
 
 ```yaml
@@ -13,6 +13,12 @@ phil_standard_webhooks:
     tolerance: 300
     # This receiver's name: an envelope must give it as its "audience". null, the default, accepts any.
     audience: shop
+    # The largest body of a delivery, in bytes, read before it is verified: a larger one is answered 413 unread.
+    # 1048576 (1 MiB) when left out.
+    max_body_bytes: 1048576
+    # The name of the configured receiver, which keys its processed ids apart from those of the other receivers, one
+    # per sender, that share the table. "default" when left out.
+    receiver: default
     # The Doctrine connection that keeps the processed ids; null keeps them elsewhere. "default" when left out,
     # null without DoctrineBundle.
     connection: default
@@ -31,6 +37,10 @@ application qui ne fait qu'envoyer aucune clé de vérification. **Les clés son
 contrôleur prend un argument `VerifiedWebhook`, et par aucune autre : une clé illisible fait répondre ce point de
 terminaison de webhooks par une erreur serveur, jamais une autre page de l'application.
 
+`audience` et `receiver` nomment deux choses différentes : `audience` est cette application, telle que les enveloppes la
+nomment ; `receiver` est le récepteur configuré, l'unique expéditeur que ses clés vérifient, sous lequel ses
+identifiants sont revendiqués.
+
 `allow_private_networks` et `allow_plain_http` protègent l'expéditeur contre la falsification de requête côté serveur
 ([sending.md](sending.md#des-url-de-récepteurs-données-par-dautres)). Ne les activez que pour des récepteurs auxquels
 l'application elle-même fait confiance, comme un noyau de test à `http://localhost` avec `allow_localhost`.
@@ -40,6 +50,8 @@ l'application elle-même fait confiance, comme un noyau de test à `http://local
 | Une clé que le bundle ne connaît pas | `Unrecognized option "…" under "phil_standard_webhooks"` |
 | `audience: ''` | `The audience is a name, or null to accept any` |
 | `tolerance: 0` | `Should be greater than or equal to 1` |
+| `max_body_bytes: 0` | `Should be greater than or equal to 1` |
+| `receiver: 'shop partner'`, ou de plus de 64 octets | `The receiver is a name of 1 to 64 letters, digits, "_", "." or "-"` |
 
 ## Générer des clés
 
@@ -60,7 +72,7 @@ l'application.
 | `Phil\StandardWebhooks\Signer`, `Phil\StandardWebhooks\Verifier` | Ceux de la bibliothèque |
 | `Phil\StandardWebhooksBundle\Application\SigningKeys` | Les clés de signature configurées |
 | `Phil\StandardWebhooksBundle\Infrastructure\Http\WebhookSender` | Public ; sur le service `http_client` |
-| `Phil\StandardWebhooks\ProcessedWebhookRepository` | Public ; un alias de `DbalProcessedWebhooks`, avec une connexion |
+| `Phil\StandardWebhooks\ProcessedWebhookRepository` | Public ; un alias de `DbalProcessedWebhooks`, avec une connexion et le `receiver` configuré |
 
 ## Les clés qui changent
 

@@ -4,6 +4,40 @@ All notable changes to `phil/standard-webhooks-bundle` will be documented in thi
 
 Updates should follow the [Keep a CHANGELOG](https://keepachangelog.com/) principles.
 
+## 0.2.0-alpha - 2026-11-20
+
+The processed ids are keyed by the receiver and the id, a change of the table to
+migrate, and a body larger than 1 MiB is answered `413` before it is read whole. See
+[Upgrading from 0.1](doc/storage.md#upgrading-from-01).
+
+### Added
+
+- `receiver`, `default` by default: the name of the configured receiver, which keys its processed ids apart from those
+  of the other receivers, one per sender, that share the table; 1 to 64 letters, digits, `_`, `.` or `-`.
+- `DbalProcessedWebhooks::forReceiver()` and `$receiver`, its second argument: the ids of another receiver, on the same
+  connection; a name that is not one is refused with an `InvalidArgumentException`.
+- `max_body_bytes`, 1 MiB by default, and `VerifiedWebhookResolver::MAX_BODY_BYTES`, its third argument: the largest
+  body read before a delivery is verified.
+- `ProcessedWebhookTable::RECEIVER_MAX_LENGTH`, `RECEIVER_PATTERN` and `DEFAULT_RECEIVER`.
+
+### Changed
+
+- The table `phil_standard_webhooks_processed` has a column `receiver`, `VARCHAR(64)`, `'default'` by default, in
+  `ascii_bin` on MySQL and MariaDB, and its primary key is `(receiver, id)`. The migration adds the column, which the
+  rows already there take as `default`, and replaces the primary key; an application that configures another
+  `receiver` moves those rows to it. `doctrine:migrations:diff` writes it from the schema listener; the SQL for
+  PostgreSQL, MySQL and MariaDB is in [Upgrading from 0.1](doc/storage.md#upgrading-from-01).
+- `claim()` inserts the receiver beside the id: `ON CONFLICT (receiver, id) DO NOTHING` on PostgreSQL. `purge()`
+  forgets the ids of every receiver.
+
+### Security
+
+- The processed ids shared one key for every sender: a sender that guessed the id of another sender's event, and sent
+  it first, had the genuine event acknowledged and never processed. Each receiver claims its ids apart.
+- The body of a delivery was read whole and hashed before any check, whatever its size: a `Content-Length` above
+  `max_body_bytes` is answered `413` before a byte is read, and a body is read up to one byte past the limit, then
+  answered `413`.
+
 ## 0.1.1-alpha - 2026-11-11
 
 ### Security
